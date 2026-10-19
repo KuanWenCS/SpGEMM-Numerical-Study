@@ -1,0 +1,9 @@
+precision,order,device,value,signed_error
+FP32,forward,CPU,1,0
+FP32,forward,GPU,1,0
+FP32,reverse,CPU,0,-1
+FP32,reverse,GPU,0,-1
+FP64,forward,CPU,1,0
+FP64,forward,GPU,1,0
+FP64,reverse,CPU,1,0
+FP64,reverse,GPU,1,0

@@ -1,0 +1,13 @@
+# Build artifacts
+/build/
+*.o
+
+# Downloaded datasets and access tools
+/matrices/
+/data/
+/ssget/
+/matrices.tar.gz
+/ssget.tar.gz
+
+# Local editor and operating-system files
+.DS_Store
