@@ -51,3 +51,30 @@ The original GPU prototype still uses dense output and must not be used directly
 3. Implement scalable CPU/GPU baselines with matching accumulation order.
 4. Compare FP32 and FP64 results under controlled settings.
 5. Add high-precision references, parallel accumulation, and validated order diagnostics.
+
+## 2026-10-21
+
+- Added structural workload analysis and sparse output construction.
+- Added CPU FP32/FP64 numerical baselines using CSR traversal order.
+- Added a GPU baseline using identical typed inputs and per-row traversal.
+- Controlled CPU/GPU tests passed.
+- Reorganized reusable implementations, applications, tests, and examples.
+- Added a Makefile with centralized floating-point compilation flags.
+- Rebuilt all programs and reran module tests after reorganization.
+
+### Initial dataset results
+
+For mesh_2d_h005 multiplied by its companion P:
+
+- Structural products: 3,471,186.
+- Maximum products per output row: 31.
+- Structural output entries: 960,341.
+- Maximum products per output entry: 10.
+- Single-product output entries: 190,587.
+- CPU zero-valued output entries: 3,400 in both precisions.
+- CPU/GPU bitwise differences: 0 in FP32 and FP64.
+- Non-finite output pairs: 0 in both precisions.
+- GPU: Quadro RTX 6000, compute capability 7.5.
+
+Agreement is established for this dataset and configuration.
+High-precision reference errors and parallel accumulation remain untested.
