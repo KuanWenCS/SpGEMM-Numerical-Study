@@ -1,0 +1,3 @@
+precision,output_entries,bitwise_differences,numeric_differences,nonfinite_pairs,max_abs_diff_finite_pairs
+FP32,960341,0,0,0,0
+FP64,960341,0,0,0,0
