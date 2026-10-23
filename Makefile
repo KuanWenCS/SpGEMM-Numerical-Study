@@ -6,7 +6,8 @@ NVCC := nvcc
 GPU ?= 0
 CUDA_ARCH ?= sm_75
 
-INCLUDES := -Iinclude
+BOOST_ROOT ?= external/boost_1_88_0
+INCLUDES := -Iinclude -I$(BOOST_ROOT)
 
 CXXFLAGS := -std=c++17 -O2 -Wall -Wextra \
             -fno-fast-math -ffp-contract=off
@@ -22,6 +23,7 @@ IO := src/core/matrix_io.cpp
 ANALYSIS := src/core/matrix_analysis.cpp
 SYMBOLIC := src/core/spgemm_symbolic.cpp
 GPU_CORE := src/core/spgemm_gpu.cu
+EXACT := src/core/exact_binary.cpp
 
 APPS := build/inspect_inputs \
         build/inspect_workload \
@@ -32,7 +34,8 @@ APPS := build/inspect_inputs \
 TESTS := build/test_matrix_analysis \
          build/test_spgemm_symbolic \
          build/test_spgemm_numeric \
-         build/test_spgemm_gpu
+         build/test_spgemm_gpu \
+         build/test_exact_binary
 
 EXAMPLES := build/gpu_check \
             build/cpu_spgemm \
@@ -69,34 +72,38 @@ build/inspect_numeric: src/apps/inspect_numeric.cpp $(IO) $(SYMBOLIC) $(HEADERS)
 build/compare_cpu_gpu: src/apps/compare_cpu_gpu.cu $(IO) $(SYMBOLIC) $(GPU_CORE) $(HEADERS) | build
 >$(NVCC) $(NVCCFLAGS) $(INCLUDES) $(filter %.cpp %.cu,$^) -o $@
 
-build/test_matrix_analysis: tests/test_matrix_analysis.cpp $(IO) $(ANALYSIS) $(HEADERS) | build
+build/test_matrix_analysis: src/tests/test_matrix_analysis.cpp $(IO) $(ANALYSIS) $(HEADERS) | build
 >$(CXX) $(CXXFLAGS) $(INCLUDES) $(filter %.cpp,$^) -o $@
 
-build/test_spgemm_symbolic: tests/test_spgemm_symbolic.cpp $(IO) $(SYMBOLIC) $(HEADERS) | build
+build/test_spgemm_symbolic: src/tests/test_spgemm_symbolic.cpp $(IO) $(SYMBOLIC) $(HEADERS) | build
 >$(CXX) $(CXXFLAGS) $(INCLUDES) $(filter %.cpp,$^) -o $@
 
-build/test_spgemm_numeric: tests/test_spgemm_numeric.cpp $(IO) $(SYMBOLIC) $(HEADERS) | build
+build/test_spgemm_numeric: src/tests/test_spgemm_numeric.cpp $(IO) $(SYMBOLIC) $(HEADERS) | build
 >$(CXX) $(CXXFLAGS) $(INCLUDES) $(filter %.cpp,$^) -o $@
 
-build/test_spgemm_gpu: tests/test_spgemm_gpu.cu $(IO) $(SYMBOLIC) $(GPU_CORE) $(HEADERS) | build
+build/test_spgemm_gpu: src/tests/test_spgemm_gpu.cu $(IO) $(SYMBOLIC) $(GPU_CORE) $(HEADERS) | build
 >$(NVCC) $(NVCCFLAGS) $(INCLUDES) $(filter %.cpp %.cu,$^) -o $@
 
-build/gpu_check: examples/gpu_check.cu $(HEADERS) | build
->$(NVCC) $(NVCCFLAGS) $(INCLUDES) $(filter %.cu,$^) -o $@
-
-build/cpu_spgemm: examples/cpu_spgemm.cpp $(HEADERS) | build
+build/test_exact_binary: src/tests/test_exact_binary.cpp $(EXACT) $(HEADERS) | build
 >$(CXX) $(CXXFLAGS) $(INCLUDES) $(filter %.cpp,$^) -o $@
 
-build/gpu_spgemm: examples/gpu_spgemm.cu $(HEADERS) | build
+build/gpu_check: src/examples/gpu_check.cu $(HEADERS) | build
 >$(NVCC) $(NVCCFLAGS) $(INCLUDES) $(filter %.cu,$^) -o $@
 
-build/precision_order: examples/precision_order.cu $(HEADERS) | build
+build/cpu_spgemm: src/examples/cpu_spgemm.cpp $(HEADERS) | build
+>$(CXX) $(CXXFLAGS) $(INCLUDES) $(filter %.cpp,$^) -o $@
+
+build/gpu_spgemm: src/examples/gpu_spgemm.cu $(HEADERS) | build
 >$(NVCC) $(NVCCFLAGS) $(INCLUDES) $(filter %.cu,$^) -o $@
 
-test-cpu: build/test_matrix_analysis build/test_spgemm_symbolic build/test_spgemm_numeric
+build/precision_order: src/examples/precision_order.cu $(HEADERS) | build
+>$(NVCC) $(NVCCFLAGS) $(INCLUDES) $(filter %.cu,$^) -o $@
+
+test-cpu: build/test_matrix_analysis build/test_spgemm_symbolic build/test_spgemm_numeric build/test_exact_binary
 >./build/test_matrix_analysis
 >./build/test_spgemm_symbolic
 >./build/test_spgemm_numeric
+>./build/test_exact_binary
 
 test-gpu: build/test_spgemm_gpu
 >CUDA_VISIBLE_DEVICES=$(GPU) ./build/test_spgemm_gpu

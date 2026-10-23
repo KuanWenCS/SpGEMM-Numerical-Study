@@ -11,3 +11,6 @@
 
 # Local editor and operating-system files
 .DS_Store
+
+# Locally downloaded third-party dependencies
+/external/
