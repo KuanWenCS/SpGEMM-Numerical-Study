@@ -14,3 +14,5 @@
 
 # Locally downloaded third-party dependencies
 /external/
+/build-sanitize/
+/results/runs/

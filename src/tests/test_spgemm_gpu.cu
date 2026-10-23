@@ -1,11 +1,13 @@
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <exception>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
 
 #include "spgemm_gpu.hpp"
+#include "experiment.hpp"
 
 namespace {
 
@@ -111,13 +113,63 @@ void run_tests()
         "empty_output", empty_A, empty_P, {});
 }
 
-} // namespace
+template <typename T>
+void test_parallel()
+{
+    study::CSRMatrix A;
+    A.rows = 1; A.cols = 256; A.row_ptr = {0, 256};
+    study::CSRMatrix P;
+    P.rows = 256; P.cols = 1;
+    for (study::Index k = 0; k < 256; ++k) {
+        A.col_idx.push_back(k); A.values.push_back(1);
+        P.row_ptr.push_back(k); P.col_idx.push_back(0); P.values.push_back(1);
+    }
+    P.row_ptr.push_back(256);
+    const auto symbolic = study::build_output_pattern(A, P);
+    const auto inputs = study::prepare_numeric_inputs<T>(A, P);
+    study::ExecutionOptions options;
+    for (const unsigned threads : {32U, 128U, 256U}) {
+        options.gpu_threads = threads;
+        const auto native = study::execute_gpu(A, P, inputs, symbolic.pattern, study::Strategy::atomic, options);
+        if (native.values != std::vector<T>{256}) throw std::runtime_error("GPU atomic updates were lost.");
+        options.trace_slot = 0;
+        options.trace_capacity = 256;
+        const auto diagnostic = study::execute_gpu(A, P, inputs, symbolic.pattern, study::Strategy::atomic, options);
+        if (diagnostic.trace.size() != 256 ||
+            study::value_bits(study::replay_gpu(diagnostic.trace)) != study::value_bits(diagnostic.values[0])) {
+            throw std::runtime_error("GPU trace replay failed.");
+        }
+        options.trace_slot.reset();
+    }
+    const T tiny = std::numeric_limits<T>::denorm_min();
+    const study::CSRMatrix tiny_A{1, 1, {0, 1}, {0}, {static_cast<double>(tiny)}};
+    const study::CSRMatrix tiny_P{1, 1, {0, 1}, {0}, {1}};
+    const auto ts = study::build_output_pattern(tiny_A, tiny_P);
+    const auto ti = study::prepare_numeric_inputs<T>(tiny_A, tiny_P);
+    const auto serial = study::execute_gpu(tiny_A, tiny_P, ti, ts.pattern, study::Strategy::serial, options);
+    if (study::value_bits(serial.values[0]) != study::value_bits(tiny)) throw std::runtime_error("Serial GPU subnormal was flushed.");
+    options.trace_slot = 0;
+    options.trace_capacity = 1;
+    const auto atomic = study::execute_gpu(tiny_A, tiny_P, ti, ts.pattern, study::Strategy::atomic, options);
+    if (atomic.trace.size() != 1 || study::value_bits(study::replay_gpu(atomic.trace)) != study::value_bits(atomic.values[0])) {
+        throw std::runtime_error("Subnormal atomic trace replay failed.");
+    }
+    std::printf("%s subnormal_probe serial_bits=%llu atomic_bits=%llu\n",
+        std::is_same_v<T, float> ? "FP32" : "FP64",
+        static_cast<unsigned long long>(study::value_bits(serial.values[0])),
+        static_cast<unsigned long long>(study::value_bits(atomic.values[0])));
+    std::printf("%s atomic_and_trace: PASS\n", std::is_same_v<T, float> ? "FP32" : "FP64");
+}
+
+}
 
 int main()
 {
     try {
         run_tests<float>();
         run_tests<double>();
+        test_parallel<float>();
+        test_parallel<double>();
         return 0;
     } catch (const std::exception& error) {
         std::fprintf(stderr, "FAIL: %s\n", error.what());
